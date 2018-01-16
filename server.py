@@ -107,7 +107,7 @@ def get(socket_connection):
 	"""
 	local_path = raw_input('Local file path: ')
 	remote_path = raw_input('Remote file path: ')
-	socket_connection.send('get %s' % local_path)
+	socket_connection.send('get %s' % remote_path)
 
 	md5sum = socket_connection.recv(1024)
 
