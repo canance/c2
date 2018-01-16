@@ -12,7 +12,7 @@ import hashlib
 import base64
 
 # supported commands
-cmds = ['sys_info', 'get_date', 'get_ip', 'get_mac', 'exit', 'shutdown_client', 'shutdown_host', 'upload', '?']
+cmds = ['sys_info', 'get_date', 'get_ip', 'get_mac', 'exit', 'shutdown_client', 'shutdown_host', 'upload', 'get', '?']
 
 def get_cmd():
 	""" helper function to get a valid command from the user """
@@ -99,6 +99,41 @@ def upload(orig_cmd, socket_connection, addr, csv_writer):
 			print '[*ERROR] Expected %s but received %s' % ('saved', wait)
 			return
 
+def get(socket_connection):
+	"""
+	receives a file from the client and saves it to a specified location
+	:param cmd: the original upload command with md5 checksum
+	:param socket_connection: a socket connection with the server
+	"""
+	local_path = raw_input('Local file path: ')
+	remote_path = raw_input('Remote file path: ')
+	socket_connection.send('get %s' % local_path)
+
+	md5sum = socket_connection.recv(1024)
+
+	socket_connection.send('ready')
+	payload = ''
+	while payload[-5:] != '\ndone':
+		chunk = socket_connection.recv(1024)
+		payload += chunk
+
+	# remove '\ndone'
+	payload = payload[:-5]
+
+	# check md5 checksum
+	md5 = hashlib.md5()
+	md5.update(payload)
+	print 'md5: %s' % md5.hexdigest()
+	if md5sum != md5.hexdigest():
+		socket_connection.send('invalid checksum')
+	else:
+		with open(local_path, 'wb') as out:
+			dec_file = base64.b64decode(payload)
+			out.write(dec_file)
+
+		socket_connection.send('saved')
+		print 'File saved to: %s' % local_path
+
 def server(ip, port, log):
 	"""
 	The main server function.  This function gets commands from the user, dispatches the command to helper function (or simply passes it to the client), and logs data to the log file.
@@ -127,6 +162,8 @@ def server(ip, port, log):
 					print '%d: %s' % (index + 1, cmd)
 			elif cmd == 'upload':
 				upload(cmd, c, addr, csv_writer)
+			elif cmd == 'get':
+				get(c)
 			else: 
 				# send the command
 				c.send(cmd)
